@@ -1,5 +1,5 @@
 (ns rate-gate.core
-  (:import (java.util.concurrent Semaphore LinkedBlockingQueue TimeUnit)))
+  (:import [java.util.concurrent LinkedBlockingQueue Semaphore TimeUnit]))
 
 (defprotocol PRateGate
   (open? [this])
@@ -42,25 +42,25 @@
   management thread which can be shut down by calling the object with no
   arguments."
   [n span-ms]
-  (let [semaphore (Semaphore. n true)
+  (let [semaphore  (Semaphore. n true)
         exit-times (LinkedBlockingQueue.)
-        done (atom false)
-        thread (doto (Thread.
-                      (fn []
-                        (while (not @done)
-                          (loop [exit-time (.peek exit-times)]
-                            (when (and exit-time
-                                       (>= 0 (- exit-time (System/nanoTime))))
-                              (.release semaphore)
-                              (.poll exit-times)
-                              (recur (.peek exit-times))))
-                          (let [delay (if-let [exit-time (.peek exit-times)]
-                                        (/ (- exit-time (System/nanoTime)) 1000000)
-                                        span-ms)]
-                            (when (pos? delay)
-                              (Thread/sleep delay))))))
-                 (.setDaemon true)
-                 (.start))]
+        done       (atom false)
+        thread     (doto (Thread.
+                          (fn []
+                            (while (not @done)
+                              (loop [exit-time (.peek exit-times)]
+                                (when (and exit-time
+                                           (>= 0 (- exit-time (System/nanoTime))))
+                                  (.release semaphore)
+                                  (.poll exit-times)
+                                  (recur (.peek exit-times))))
+                              (let [delay (if-let [exit-time (.peek exit-times)]
+                                            (/ (- exit-time (System/nanoTime)) 1000000)
+                                            span-ms)]
+                                (when (pos? delay)
+                                  (Thread/sleep delay))))))
+                     (.setDaemon true)
+                     (.start))]
     (RateGate. n span-ms semaphore exit-times done thread)))
 
 (defn rate-limit
